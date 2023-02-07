@@ -1,9 +1,11 @@
+## 0.1.0
+* Initial stable
+
+
 ## 0.0.1-dev.2
 
 * Debug iOS and web 
 
-## 0.1.0
-* Initial stable
 
 ## 0.0.1-dev.1
 
