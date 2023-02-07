@@ -22,7 +22,7 @@ dependencies:
   http: 
   shared_preferences:
   flutter_secure_storage:
-  webview_flutter: ^4.0.0
+  flutter_webview_plugin: ^0.4.0
 
 dev_dependencies:
   flutter_test:

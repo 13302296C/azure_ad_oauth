@@ -4,7 +4,7 @@ import 'package:azure_ad_oauth/model/config.dart';
 import 'package:azure_ad_oauth/model/token.dart';
 import 'package:azure_ad_oauth/request/authorization_request.dart';
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_webview_plugin/flutter_webview_plugin.dart';
 
 class RequestCode {
   final Config _config;
@@ -58,53 +58,36 @@ class RequestCodeInterface extends StatefulWidget {
 }
 
 class _RequestCodeInterfaceState extends State<RequestCodeInterface> {
-  final WebViewController _controller = WebViewController();
+  final flutterWebviewPlugin = FlutterWebviewPlugin();
+
   String error = '';
   @override
   void initState() {
-    if (widget.userAgent != null) _controller.setUserAgent(widget.userAgent);
-    _controller.setJavaScriptMode(JavaScriptMode.unrestricted);
-    _controller.setBackgroundColor(Colors.black);
-    _controller.setNavigationDelegate(NavigationDelegate(
-      onNavigationRequest: (request) async {
-        var uri = Uri.parse(request.url);
-        if (uri.queryParameters['error'] != null) {
-          Navigator.of(context).pop(RequestCode.ex);
-        }
+    flutterWebviewPlugin.onUrlChanged.listen((String url) async {
+      var uri = Uri.parse(url);
+      if (uri.queryParameters['error'] != null) {
+        await clearCache();
+        flutterWebviewPlugin.close();
+        Navigator.of(context).pop(RequestCode.ex);
 
-        if (uri.queryParameters['code'] != null) {
-          try {
-            await _controller.clearCache();
-            await _controller.clearLocalStorage();
-          } catch (e, s) {
-            log('Error clearing cache', error: e, stackTrace: s);
-          }
+        //_onCodeListener.add(null);
+      }
 
-          // ignore: use_build_context_synchronously
-          Navigator.of(context).pop(uri.queryParameters['code']);
-          return NavigationDecision.prevent;
-        }
-        return NavigationDecision.navigate;
-      },
-      onPageStarted: (url) {
-        //log('Page started loading: $url');
-      },
-      onPageFinished: (url) {
-        //log('Page finished loading: $url');
-      },
-      onProgress: (progress) {
-        //log('Page loading progress: $progress');
-      },
-      onWebResourceError: (error) {
-        //log('Page loading error: $error');
-        setState(() {
-          this.error = 'Error ${error.errorCode}:\n\n${error.description}';
-        });
-      },
-    ));
+      if (uri.queryParameters['code'] != null) {
+        await clearCache();
+        flutterWebviewPlugin.close();
+        Navigator.of(context).pop(uri.queryParameters['code']);
+      }
+    });
+    flutterWebviewPlugin.onProgressChanged.listen((event) {});
+    flutterWebviewPlugin.onHttpError.listen((event) {
+      log(event.toString());
 
-    _controller.loadRequest(Uri.parse(widget.url));
-
+      flutterWebviewPlugin.close();
+      setState(() {
+        error = event.toString();
+      });
+    });
     super.initState();
   }
 
@@ -114,36 +97,34 @@ class _RequestCodeInterfaceState extends State<RequestCodeInterface> {
   }
 
   Future<void> clearCache() async {
-    await _controller.clearCache();
-    await _controller.clearLocalStorage();
+    await flutterWebviewPlugin.cleanCookies();
+    await flutterWebviewPlugin.clearCache();
+  }
+
+  ///
+  Future<void> launchAuth() async {
+    await flutterWebviewPlugin.launch(
+      widget.url,
+      withJavascript: true,
+      clearCache: true,
+      clearCookies: true,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(
-          title: const Text('Authenticate'),
-        ),
-        body: error.isEmpty
-            ? WebViewWidget(controller: _controller)
-            : Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // ignore: prefer_const_constructors
-                    Icon(
-                      Icons.bug_report,
-                      size: 40.0,
-                      color: Colors.red,
-                    ),
-                    const SizedBox(height: 16.0),
-                    Text(
-                      error,
-                      style: const TextStyle(fontSize: 18.0),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                )));
+    return WillPopScope(
+      onWillPop: () async {
+        await clearCache();
+        // ignore: use_build_context_synchronously
+        Navigator.pop(context, null);
+        return true;
+      },
+      child: Scaffold(
+          appBar: AppBar(
+            title: const Text("Authenticate"),
+          ),
+          body: Center()),
+    );
   }
 }
