@@ -88,6 +88,9 @@ class _RequestCodeInterfaceState extends State<RequestCodeInterface> {
         error = event.toString();
       });
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await launchAuth();
+    });
     super.initState();
   }
 
