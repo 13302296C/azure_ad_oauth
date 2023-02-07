@@ -23,7 +23,6 @@ dependencies:
   shared_preferences:
   flutter_secure_storage:
   webview_flutter: ^4.0.0
-  pedantic:
 
 dev_dependencies:
   flutter_test:
