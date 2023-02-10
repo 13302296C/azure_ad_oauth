@@ -1,6 +1,9 @@
 ## 0.1.0
 * Initial stable
 
+## 0.0.1-fwp
+
+* webview based on `flutter_webview_plugin`
 
 ## 0.0.1-dev.2
 

@@ -127,7 +127,7 @@ class _RequestCodeInterfaceState extends State<RequestCodeInterface> {
           appBar: AppBar(
             title: const Text("Authenticate"),
           ),
-          body: Center()),
+          body: const Center()),
     );
   }
 }

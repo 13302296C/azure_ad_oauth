@@ -3,8 +3,11 @@ import 'package:azure_ad_oauth/jwt.dart';
 import 'package:flutter/foundation.dart';
 
 class OAuth extends ChangeNotifier {
-  static const String tenantId = '';
-  static const String clientId = '';
+  /// Tenant ID of you Azure account
+  static const String tenantId = ''; // TODO: set your tenant ID
+
+  /// Client ID of you Azure application
+  static const String clientId = ''; // TODO: set your client ID
 
   late final AzureADoAuth oAuth;
   late final Config config;
