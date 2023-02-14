@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:developer';
 import 'package:azure_ad_oauth/model/config.dart';
 import 'package:azure_ad_oauth/model/token.dart';
 import 'package:azure_ad_oauth/request/authorization_request.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_webview_plugin/flutter_webview_plugin.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 class RequestCode {
   final Config _config;
@@ -23,10 +22,16 @@ class RequestCode {
     String initialURL =
         ('${_authorizationRequest.url}?$urlParams').replaceAll(' ', '%20');
 
-    return await Navigator.of(_config.context!)
-        .push<String?>(MaterialPageRoute<String?>(builder: (context) {
+    var authResult = await Navigator.of(_config.context!)
+        .push(MaterialPageRoute(builder: (context) {
       return RequestCodeInterface(url: initialURL);
     }));
+
+    if (authResult is Exception) {
+      return Future.error(authResult);
+    }
+
+    return authResult;
   }
 
   Future<void> clearCookies() async {
@@ -58,76 +63,137 @@ class RequestCodeInterface extends StatefulWidget {
 }
 
 class _RequestCodeInterfaceState extends State<RequestCodeInterface> {
-  final flutterWebviewPlugin = FlutterWebviewPlugin();
+  InAppWebViewController? wvController;
 
-  String error = '';
-  @override
-  void initState() {
-    flutterWebviewPlugin.onUrlChanged.listen((String url) async {
-      var uri = Uri.parse(url);
-      if (uri.queryParameters['error'] != null) {
-        await clearCache();
-        flutterWebviewPlugin.close();
-        Navigator.of(context).pop(RequestCode.ex);
-
-        //_onCodeListener.add(null);
-      }
-
-      if (uri.queryParameters['code'] != null) {
-        await clearCache();
-        flutterWebviewPlugin.close();
-        Navigator.of(context).pop(uri.queryParameters['code']);
-      }
-    });
-    flutterWebviewPlugin.onProgressChanged.listen((event) {});
-    flutterWebviewPlugin.onHttpError.listen((event) {
-      log(event.toString());
-
-      flutterWebviewPlugin.close();
-      setState(() {
-        error = event.toString();
-      });
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await launchAuth();
-    });
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
+  String _error = '';
 
   Future<void> clearCache() async {
-    await flutterWebviewPlugin.cleanCookies();
-    await flutterWebviewPlugin.clearCache();
-  }
-
-  ///
-  Future<void> launchAuth() async {
-    await flutterWebviewPlugin.launch(
-      widget.url,
-      withJavascript: true,
-      clearCache: true,
-      clearCookies: true,
-    );
+    await wvController?.clearCache();
+    wvController = null;
   }
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      onWillPop: () async {
-        await clearCache();
-        // ignore: use_build_context_synchronously
-        Navigator.pop(context, null);
-        return true;
-      },
-      child: Scaffold(
+        onWillPop: () async {
+          await clearCache();
+          // ignore: use_build_context_synchronously
+          Navigator.pop(context, null);
+          return true;
+        },
+        child: Scaffold(
           appBar: AppBar(
             title: const Text("Authenticate"),
           ),
-          body: const Center()),
+          body: _error.isNotEmpty
+              ? _ErrorMsg(err: _error)
+              : InAppWebView(
+                  initialUrlRequest: URLRequest(url: Uri.parse(widget.url)),
+                  initialOptions: InAppWebViewGroupOptions(
+                    crossPlatform: InAppWebViewOptions(
+                      clearCache: true,
+                      userAgent: widget.userAgent ?? '',
+                      javaScriptEnabled: true,
+                      incognito: true,
+                      cacheEnabled: false,
+                    ),
+                  ),
+                  onWebViewCreated: (InAppWebViewController controller) {
+                    wvController = controller;
+                  },
+                  onLoadStart: (InAppWebViewController controller, Uri? url) {
+                    //log('onLoadStart: ${url.toString()}');
+                  },
+                  onLoadStop:
+                      (InAppWebViewController controller, Uri? uri) async {
+                    //log('onLoadStop: ${uri.toString()}');
+                    if (uri!.queryParameters['error'] != null) {
+                      await clearCache();
+                      setState(() {
+                        if (uri.queryParameters['error'] == 'access_denied') {
+                          if (uri.queryParameters['error_subcode'] ==
+                              'cancel') {
+                            _error = 'Authentication cancelled';
+                          } else {
+                            _error = 'Access denied';
+                          }
+                        } else {
+                          _error = uri.queryParameters['error']!;
+                        }
+                      });
+                    }
+
+                    if (uri.queryParameters['code'] != null) {
+                      await clearCache();
+                      Navigator.of(context).pop(uri.queryParameters['code']);
+                    }
+                  },
+                  onProgressChanged:
+                      (InAppWebViewController controller, int progress) {
+                    //log('onProgressChanged: ${progress.toString()}');
+                  },
+                  onConsoleMessage: (InAppWebViewController controller,
+                      ConsoleMessage consoleMessage) {
+                    //log('onConsoleMessage: ${consoleMessage.message}');
+                  },
+                  onLoadError:
+                      (InAppWebViewController wvc, Uri? u, int c, String s) {
+                    //log('onLoadError: [$c]: $s');
+                    if (c == -10) return;
+                    setState(() {
+                      if (c == -2) {
+                        _error =
+                            'Network Error: Could not contact Authentication '
+                            'Provider. Please check your Internet connection.';
+                      } else {
+                        _error = s;
+                      }
+                    });
+                  },
+                  onLoadHttpError:
+                      (InAppWebViewController wvc, Uri? u, int c, String s) {
+                    //log('onLoadHttpError: [$c]: $s');
+                    setState(() {
+                      _error = s;
+                    });
+                  },
+                ),
+        ));
+  }
+}
+
+class _ErrorMsg extends StatelessWidget {
+  const _ErrorMsg({Key? key, required this.err}) : super(key: key);
+  final String err;
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.bug_report,
+              size: 64,
+              color: Colors.red,
+            ),
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Text(
+                err,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 18),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(Exception(err));
+              },
+              child: const Text('< Go back'),
+            ),
+          ]),
     );
   }
 }

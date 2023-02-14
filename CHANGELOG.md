@@ -1,19 +1,10 @@
+## 0.3.0 - stable
+* Working version based on `flutter_inappwebview: ^5.7.2+3`
+
+
+## 0.2.0 - stable
+* Working version based on `flutter_webview_plugin: ^0.4.0`
+
 ## 0.1.0
-* Initial stable
+* Initial stable (webview_flutter - based)
 
-## 0.0.1-fwp
-
-* webview based on `flutter_webview_plugin`
-
-## 0.0.1-dev.2
-
-* Debug iOS and web 
-
-
-## 0.0.1-dev.1
-
-* Add singleton pattern example and test on iOS, Web, Android
-
-## 0.0.1
-
-* Initial

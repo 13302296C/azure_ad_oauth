@@ -57,8 +57,22 @@ class _MyHomePageState extends State<MyHomePage> {
                         ? null
                         : () {
                             OAuth.instance.isLoggedIn
-                                ? OAuth.instance.logout()
-                                : OAuth.instance.login();
+                                ? OAuth.instance
+                                    .logout()
+                                    .onError((error, stackTrace) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                            content: Text(error.toString())));
+                                    setState(() {});
+                                  })
+                                : OAuth.instance
+                                    .login()
+                                    .onError((error, stackTrace) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                            content: Text(error.toString())));
+                                    setState(() {});
+                                  });
                           },
                     child: OAuth.instance.loginInProgress
                         ? const SizedBox(
