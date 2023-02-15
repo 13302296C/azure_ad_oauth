@@ -57,8 +57,12 @@ class _MyHomePageState extends State<MyHomePage> {
                         ? null
                         : () {
                             OAuth.instance.isLoggedIn
-                                ? OAuth.instance.logout()
-                                : OAuth.instance.login();
+                                ? OAuth.instance.logout().onError(
+                                    (error, stackTrace) =>
+                                        showErrorToast(error.toString()))
+                                : OAuth.instance.login().onError(
+                                    (error, stackTrace) =>
+                                        showErrorToast(error.toString()));
                           },
                     child: OAuth.instance.loginInProgress
                         ? const SizedBox(
@@ -73,5 +77,12 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
           );
         });
+  }
+
+  /// Show error message
+  Future<void> showErrorToast(String message) async {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+    ));
   }
 }

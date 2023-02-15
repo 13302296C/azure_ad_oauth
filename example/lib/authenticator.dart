@@ -60,8 +60,16 @@ class OAuth extends ChangeNotifier {
   Future<void> login() async {
     loginInProgress = true;
     notifyListeners();
-    await oAuth.login();
-    map = await getJwtData();
+
+    try {
+      await oAuth.login();
+      map = await getJwtData();
+    } on Exception {
+      loginInProgress = false;
+      notifyListeners();
+      rethrow;
+    }
+
     loginInProgress = false;
     notifyListeners();
   }
@@ -70,8 +78,15 @@ class OAuth extends ChangeNotifier {
   Future<void> logout() async {
     loginInProgress = true;
     notifyListeners();
-    await oAuth.logout();
     map = {};
+    try {
+      await oAuth.logout();
+    } on Exception {
+      loginInProgress = false;
+      notifyListeners();
+      rethrow;
+    }
+
     loginInProgress = false;
     notifyListeners();
   }
