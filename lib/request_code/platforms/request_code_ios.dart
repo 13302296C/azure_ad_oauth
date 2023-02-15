@@ -113,6 +113,7 @@ class _RequestCodeInterfaceState extends State<RequestCodeInterface> {
   }
 
   Future<void> clearCache() async {
+    await WebViewCookieManager().clearCookies();
     await _controller.clearCache();
     await _controller.clearLocalStorage();
   }
