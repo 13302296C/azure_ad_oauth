@@ -1,3 +1,5 @@
+import 'package:future_debounce_button/future_debounce_button.dart';
+
 import 'authenticator.dart';
 import 'package:flutter/material.dart';
 
@@ -49,43 +51,28 @@ class _MyHomePageState extends State<MyHomePage> {
                         'WELCOME\n ${OAuth.instance.map['name']}\n(${OAuth.instance.map['preferred_username']})',
                         textAlign: TextAlign.center),
                   const SizedBox(height: 20),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      fixedSize: const Size(200, 50),
-                    ),
-                    onPressed: OAuth.instance.loginInProgress
-                        ? null
-                        : () {
-                            OAuth.instance.isLoggedIn
-                                ? OAuth.instance
-                                    .logout()
-                                    .onError((error, stackTrace) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                            content: Text(error.toString())));
-                                    setState(() {});
-                                  })
-                                : OAuth.instance
-                                    .login()
-                                    .onError((error, stackTrace) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                            content: Text(error.toString())));
-                                    setState(() {});
-                                  });
-                          },
-                    child: OAuth.instance.loginInProgress
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child:
-                                CircularProgressIndicator(color: Colors.white))
-                        : Text(OAuth.instance.isLoggedIn ? 'Logout' : 'Login'),
-                  ),
+                  SizedBox.fromSize(
+                      size: const Size(200, 50),
+                      child: FutureDebounceButton(
+                        onPressed: OAuth.instance.isLoggedIn
+                            ? OAuth.instance.logout
+                            : OAuth.instance.login,
+                        actionCallText:
+                            OAuth.instance.isLoggedIn ? 'Logout' : 'Login',
+                        onError: (error, stackTrace) =>
+                            showErrorToast(error.toString()),
+                      ))
                 ],
               ),
             ),
           );
         });
+  }
+
+  /// Show error message
+  Future<void> showErrorToast(String message) async {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+    ));
   }
 }

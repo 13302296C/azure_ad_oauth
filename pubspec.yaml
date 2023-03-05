@@ -1,6 +1,6 @@
 name: azure_ad_oauth
-description: Flutter Azure AD oAuth client for web, iOS nad Android.
-version: 0.3.0
+description: Flutter Azure AD oAuth - based on webview_flutter 4.x.x package.
+version: 0.4.1
 
 repository: https://github.com/13302296C/azure_ad_oauth
 issue_tracker: https://github.com/13302296C/azure_ad_oauth/issues
@@ -22,7 +22,7 @@ dependencies:
   http: 
   shared_preferences:
   flutter_secure_storage:
-  flutter_inappwebview: ^5.7.2+3
+  webview_flutter: ^4.0.0
 
 dev_dependencies:
   flutter_test:

@@ -3,7 +3,7 @@ import 'package:azure_ad_oauth/model/config.dart';
 import 'package:azure_ad_oauth/model/token.dart';
 import 'package:azure_ad_oauth/request/authorization_request.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 class RequestCode {
   final Config _config;
@@ -17,25 +17,24 @@ class RequestCode {
   }
 
   Future<String?> requestCode() async {
-    if (_config.context == null) return null;
+    if (_config.context == null) {
+      return null;
+    }
     final String urlParams = _constructUrlParams();
     String initialURL =
         ('${_authorizationRequest.url}?$urlParams').replaceAll(' ', '%20');
 
-    var authResult = await Navigator.of(_config.context!)
+    var requestCodeResult = await Navigator.of(_config.context!)
         .push(MaterialPageRoute(builder: (context) {
-      return RequestCodeInterface(url: initialURL);
+      return RequestCodeInterface(
+          url: initialURL, userAgent: _config.userAgent);
     }));
 
-    if (authResult is Exception) {
-      return Future.error(authResult);
-    }
-
-    return authResult;
+    return requestCodeResult;
   }
 
   Future<void> clearCookies() async {
-    // no need to clear it here, as we clear it on exit during token request
+    //
   }
 
   String _constructUrlParams() =>
@@ -58,142 +57,101 @@ class RequestCodeInterface extends StatefulWidget {
       : super(key: key);
   final String url;
   final String? userAgent;
+
   @override
   State<RequestCodeInterface> createState() => _RequestCodeInterfaceState();
 }
 
 class _RequestCodeInterfaceState extends State<RequestCodeInterface> {
-  InAppWebViewController? wvController;
+  final WebViewController _controller = WebViewController();
+  String error = '';
+  @override
+  void initState() {
+    if (widget.userAgent != null) _controller.setUserAgent(widget.userAgent);
+    _controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+    _controller.setBackgroundColor(Colors.black);
+    _controller.setNavigationDelegate(NavigationDelegate(
+      onNavigationRequest: (request) async {
+        var uri = Uri.parse(request.url);
+        if (uri.queryParameters['error'] != null) {
+          Navigator.of(context).pop(null);
+          return NavigationDecision.prevent;
+        }
 
-  String _error = '';
+        if (uri.queryParameters['code'] != null) {
+          Navigator.of(context).pop(uri.queryParameters['code']);
+          return NavigationDecision.prevent;
+        }
+        return NavigationDecision.navigate;
+      },
+      onPageStarted: (url) {
+        //log('Page started loading: $url');
+      },
+      onPageFinished: (url) {
+        //log('Page finished loading: $url');
+      },
+      onProgress: (progress) {
+        //log('Page loading progress: $progress');
+      },
+      onWebResourceError: (error) {
+        //log('Page loading error: $error');
+        setState(() {
+          this.error = 'Error ${error.errorCode}:\n\n${error.description}';
+        });
+      },
+    ));
+
+    _controller.loadRequest(Uri.parse(widget.url));
+
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    clearCache();
+    super.dispose();
+  }
 
   Future<void> clearCache() async {
-    await wvController?.clearCache();
-    wvController = null;
+    await WebViewCookieManager().clearCookies();
+    await _controller.clearCache();
+    await _controller.clearLocalStorage();
   }
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-        onWillPop: () async {
-          await clearCache();
-          // ignore: use_build_context_synchronously
-          Navigator.pop(context, null);
-          return true;
-        },
-        child: Scaffold(
+      onWillPop: () async {
+        await clearCache();
+        return true;
+      },
+      child: Scaffold(
           appBar: AppBar(
-            title: const Text("Authenticate"),
+            title: const Text('Authenticate'),
           ),
-          body: _error.isNotEmpty
-              ? _ErrorMsg(err: _error)
-              : InAppWebView(
-                  initialUrlRequest: URLRequest(url: Uri.parse(widget.url)),
-                  initialOptions: InAppWebViewGroupOptions(
-                    crossPlatform: InAppWebViewOptions(
-                      clearCache: true,
-                      userAgent: widget.userAgent ?? '',
-                      javaScriptEnabled: true,
-                      incognito: true,
-                      cacheEnabled: false,
+          body: error.isEmpty
+              ? WebViewWidget(controller: _controller)
+              : Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // ignore: prefer_const_constructors
+                        Icon(
+                          Icons.bug_report,
+                          size: 40.0,
+                          color: Colors.red,
+                        ),
+                        const SizedBox(height: 16.0),
+                        Text(
+                          error,
+                          style: const TextStyle(fontSize: 18.0),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
-                  ),
-                  onWebViewCreated: (InAppWebViewController controller) {
-                    wvController = controller;
-                  },
-                  onLoadStart: (InAppWebViewController controller, Uri? url) {
-                    //log('onLoadStart: ${url.toString()}');
-                  },
-                  onLoadStop:
-                      (InAppWebViewController controller, Uri? uri) async {
-                    //log('onLoadStop: ${uri.toString()}');
-                    if (uri!.queryParameters['error'] != null) {
-                      await clearCache();
-                      setState(() {
-                        if (uri.queryParameters['error'] == 'access_denied') {
-                          if (uri.queryParameters['error_subcode'] ==
-                              'cancel') {
-                            _error = 'Authentication cancelled';
-                          } else {
-                            _error = 'Access denied';
-                          }
-                        } else {
-                          _error = uri.queryParameters['error']!;
-                        }
-                      });
-                    }
-
-                    if (uri.queryParameters['code'] != null) {
-                      await clearCache();
-                      Navigator.of(context).pop(uri.queryParameters['code']);
-                    }
-                  },
-                  onProgressChanged:
-                      (InAppWebViewController controller, int progress) {
-                    //log('onProgressChanged: ${progress.toString()}');
-                  },
-                  onConsoleMessage: (InAppWebViewController controller,
-                      ConsoleMessage consoleMessage) {
-                    //log('onConsoleMessage: ${consoleMessage.message}');
-                  },
-                  onLoadError:
-                      (InAppWebViewController wvc, Uri? u, int c, String s) {
-                    //log('onLoadError: [$c]: $s');
-                    if (c == -10) return;
-                    setState(() {
-                      if (c == -2) {
-                        _error =
-                            'Network Error: Could not contact Authentication '
-                            'Provider. Please check your Internet connection.';
-                      } else {
-                        _error = s;
-                      }
-                    });
-                  },
-                  onLoadHttpError:
-                      (InAppWebViewController wvc, Uri? u, int c, String s) {
-                    //log('onLoadHttpError: [$c]: $s');
-                    setState(() {
-                      _error = s;
-                    });
-                  },
-                ),
-        ));
-  }
-}
-
-class _ErrorMsg extends StatelessWidget {
-  const _ErrorMsg({Key? key, required this.err}) : super(key: key);
-  final String err;
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.bug_report,
-              size: 64,
-              color: Colors.red,
-            ),
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Text(
-                err,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 18),
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop(Exception(err));
-              },
-              child: const Text('< Go back'),
-            ),
-          ]),
+                  ))),
     );
   }
 }
