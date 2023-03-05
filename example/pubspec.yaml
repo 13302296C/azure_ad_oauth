@@ -15,6 +15,7 @@ dependencies:
   azure_ad_oauth:
     path: ../
   cupertino_icons: ^1.0.2
+  future_debounce_button: ^0.1.0
 
 dev_dependencies:
   flutter_test:
